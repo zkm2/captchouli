@@ -257,7 +257,10 @@ func (s *Service) NewCaptcha(w io.Writer, colour, background string,
 		// Not enough to generate captcha. Schedule a fetch and try a different
 		// tag.
 		if !common.IsTest {
-			scheduleFetch <- f.FetchRequest
+			select {
+			case scheduleFetch <- f.FetchRequest:
+			default:
+			}
 		}
 		return s.NewCaptcha(w, colour, background)
 	}
@@ -291,7 +294,10 @@ func (s *Service) NewCaptcha(w io.Writer, colour, background string,
 	templates.WriteCaptcha(w, colour, background, tagF, id, images)
 
 	if !common.IsTest {
-		scheduleFetch <- f.FetchRequest
+		select {
+		case scheduleFetch <- f.FetchRequest:
+		default:
+		}
 	}
 	return
 }

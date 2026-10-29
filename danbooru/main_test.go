@@ -2,10 +2,16 @@ package danbooru
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/bakape/captchouli/v2/common"
 	"github.com/bakape/captchouli/v2/db"
@@ -19,6 +25,45 @@ func TestMain(t *testing.M) {
 
 func TestFetch(t *testing.T) {
 	testFetches(t, "sakura_kyouko")
+}
+
+func TestFetchTimeout(t *testing.T) {
+	if httpClient.Timeout <= 0 {
+		t.Fatal("upstream HTTP client has no timeout")
+	}
+	previous := httpClient
+	httpClient = &http.Client{Timeout: 100 * time.Millisecond}
+	defer func() { httpClient = previous }()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	const tag = "captchouli_timeout_test"
+	for index := 0; index < 3; index++ {
+		err := db.InsertPendingImage(db.PendingImage{
+			MD5:       md5.Sum([]byte(fmt.Sprintf("%s_%d", tag, index))),
+			TargetTag: tag,
+			URL:       server.URL,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer db.PopRandomPendingImage(tag)
+	}
+
+	file, _, err := Fetch(common.FetchRequest{Tag: tag})
+	if file != nil {
+		file.Close()
+		os.Remove(file.Name())
+		t.Error("timed-out download returned a temporary file")
+	}
+	var timeout net.Error
+	if !errors.As(err, &timeout) || !timeout.Timeout() {
+		t.Fatalf("expected body-read timeout, got %v", err)
+	}
 }
 
 func testFetches(t *testing.T, tag string) {

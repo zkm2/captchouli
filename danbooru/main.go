@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/bakape/boorufetch"
 	"github.com/bakape/captchouli/v2/common"
@@ -18,8 +19,9 @@ import (
 )
 
 var (
-	cache = make(map[string]*cacheEntry)
-	mu    sync.Mutex
+	httpClient = &http.Client{Timeout: time.Minute}
+	cache      = make(map[string]*cacheEntry)
+	mu         sync.Mutex
 
 	blacklisted = map[string]struct{}{
 		"photo":           {},
@@ -82,7 +84,7 @@ func Fetch(req common.FetchRequest) (f *os.File, image db.Image, err error) {
 		Tags:   img.Tags,
 	}
 
-	r, err := http.Get(img.URL)
+	r, err := httpClient.Get(img.URL)
 	if err != nil {
 		return
 	}

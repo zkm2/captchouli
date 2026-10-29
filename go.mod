@@ -13,4 +13,4 @@ require (
 
 go 1.13
 
-replace github.com/bakape/boorufetch => github.com/zkm/boorufetch v1.1.7
+replace github.com/bakape/boorufetch => github.com/zkm2/boorufetch v1.1.7
